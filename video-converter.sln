@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "video-converter", "video-converter\video-converter.csproj", "{4EFE6172-AAD5-4394-8A9E-356BC6023808}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4EFE6172-AAD5-4394-8A9E-356BC6023808}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4EFE6172-AAD5-4394-8A9E-356BC6023808}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4EFE6172-AAD5-4394-8A9E-356BC6023808}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4EFE6172-AAD5-4394-8A9E-356BC6023808}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {22E9667D-CE29-484F-8B45-6A75E15E88F8}
+	EndGlobalSection
+EndGlobal
