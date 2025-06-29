@@ -1,9 +1,21 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="video_converter.MainWindow"
-        Title="video_converter">
-    Welcome to Avalonia!
+        Title="Video Converter" Width="500" Height="350">
+  <StackPanel Margin="20" Spacing="10">
+    <TextBlock Text="Folder z plikami wideo:"/>
+    <Button x:Name="SelectFolderButton" Content="Wybierz folder..."/>
+    <TextBlock Text="Plik wideo:"/>
+    <ComboBox x:Name="FileComboBox"/>
+    <TextBlock Text="Docelowy format:"/>
+    <ComboBox x:Name="FormatComboBox">
+      <ComboBoxItem Content="mp4"/>
+      <ComboBoxItem Content="mov"/>
+      <ComboBoxItem Content="avi"/>
+      <ComboBoxItem Content="mkv"/>
+      <ComboBoxItem Content="webm"/>
+    </ComboBox>
+    <Button x:Name="ConvertButton" Content="Konwertuj"/>
+    <TextBlock x:Name="StatusText" Foreground="DarkGreen"/>
+  </StackPanel>
 </Window>

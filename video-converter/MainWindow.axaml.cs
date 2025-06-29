@@ -3,108 +3,94 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace video_converter
 {
     public partial class MainWindow : Window
     {
-        private TextBox inputFileTextBox;
-        private ComboBox formatComboBox;
-        private Button convertButton;
-        private TextBlock statusText;
+        private ComboBox? fileComboBox;
+        private ComboBox? formatComboBox;
+        private Button? convertButton;
+        private Button? selectFolderButton;
+        private TextBlock? statusText;
+        private string selectedFolder = "";
 
         public MainWindow()
         {
             InitializeComponent();
-            InitializeUIComponents();
+            fileComboBox = this.FindControl<ComboBox>("FileComboBox");
+            formatComboBox = this.FindControl<ComboBox>("FormatComboBox");
+            convertButton = this.FindControl<Button>("ConvertButton");
+            selectFolderButton = this.FindControl<Button>("SelectFolderButton");
+            statusText = this.FindControl<TextBlock>("StatusText");
             SetupEventHandlers();
-        }
-
-        private void InitializeUIComponents()
-        {
-            inputFileTextBox = new TextBox { Watermark = "Select a video file..." };
-            formatComboBox = new ComboBox
-            {
-                Items = new[] { "mp4", "mov", "avi", "mkv", "webm" },
-                SelectedIndex = 0
-            };
-            convertButton = new Button { Content = "Convert" };
-            statusText = new TextBlock();
-
-            var stackPanel = new StackPanel
-            {
-                Margin = new Avalonia.Thickness(20),
-                Spacing = 10
-            };
-
-            stackPanel.Children.Add(new TextBlock { Text = "Input File:" });
-            stackPanel.Children.Add(inputFileTextBox);
-
-            var browseButton = new Button { Content = "Browse..." };
-            stackPanel.Children.Add(browseButton);
-
-            stackPanel.Children.Add(new TextBlock { Text = "Target Format:" });
-            stackPanel.Children.Add(formatComboBox);
-            stackPanel.Children.Add(convertButton);
-            stackPanel.Children.Add(statusText);
-
-            this.Content = stackPanel;
         }
 
         private void SetupEventHandlers()
         {
-            var browseButton = (Button)((StackPanel)this.Content).Children[2];
-            browseButton.Click += async (sender, e) =>
+            selectFolderButton.Click += async (sender, e) =>
             {
-                var openFileDialog = new OpenFileDialog();
-                openFileDialog.Filters.Add(new FileDialogFilter { Name = "Video Files", Extensions = { "mp4", "mov", "avi", "mkv", "webm" } });
-                var result = await openFileDialog.ShowAsync(this);
-
-                if (result != null && result.Length > 0)
+                var dialog = new OpenFolderDialog();
+                var folder = await dialog.ShowAsync(this);
+                if (!string.IsNullOrWhiteSpace(folder))
                 {
-                    inputFileTextBox.Text = result[0];
+                    selectedFolder = folder;
+                    LoadVideoFiles(folder);
                 }
             };
 
             convertButton.Click += async (sender, e) =>
             {
-                if (string.IsNullOrWhiteSpace(inputFileTextBox.Text))
+                if (fileComboBox.SelectedItem == null)
                 {
-                    statusText.Text = "Please select a file first!";
+                    statusText.Text = "Wybierz plik wideo!";
                     return;
                 }
 
-                if (!File.Exists(inputFileTextBox.Text))
+                string selectedFile = fileComboBox.SelectedItem as string;
+                string targetFormat = (formatComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() 
+                                      ?? formatComboBox.SelectedItem as string;
+
+                if (string.IsNullOrWhiteSpace(selectedFile) || string.IsNullOrWhiteSpace(targetFormat))
                 {
-                    statusText.Text = "Selected file doesn't exist!";
+                    statusText.Text = "Wybierz plik i format!";
                     return;
                 }
 
-                string selectedFile = inputFileTextBox.Text;
-                string targetFormat = formatComboBox.SelectedItem as string;
-
-                statusText.Text = $"Converting to {targetFormat}...";
+                statusText.Text = $"Konwertowanie do {targetFormat}...";
 
                 try
                 {
                     var converter = new VideoConverter();
                     converter.OnConversionCompleted += (outputFile) =>
                     {
-                        statusText.Text = $"Conversion complete! Output file: {outputFile}";
+                        statusText.Text = $"Konwersja zakończona! Plik wynikowy: {outputFile}";
                     };
 
                     await converter.ConvertAsync(selectedFile, targetFormat);
 
-                    new LogManager().LogConversion(selectedFile,
-                        Path.Combine(Path.GetDirectoryName(selectedFile),
-                        Path.GetFileNameWithoutExtension(selectedFile) + "." + targetFormat),
-                        targetFormat);
+                    var dir = Path.GetDirectoryName(selectedFile) ?? "";
+                    var outFile = Path.Combine(dir, Path.GetFileNameWithoutExtension(selectedFile) + "." + targetFormat);
+                    new LogManager().LogConversion(selectedFile, outFile, targetFormat);
                 }
                 catch (Exception ex)
                 {
-                    statusText.Text = $"Error during conversion: {ex.Message}";
+                    statusText.Text = $"Błąd podczas konwersji: {ex.Message}";
                 }
             };
+        }
+
+        private void LoadVideoFiles(string folder)
+        {
+            var extensions = new[] { ".mp4", ".mov", ".avi", ".mkv", ".webm" };
+            var files = Directory.GetFiles(folder)
+                .Where(f => extensions.Contains(Path.GetExtension(f).ToLower()))
+                .ToList();
+
+            fileComboBox.ItemsSource = files;
+            fileComboBox.SelectedIndex = files.Count > 0 ? 0 : -1;
         }
     }
 
