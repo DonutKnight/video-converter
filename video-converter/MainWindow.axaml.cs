@@ -1,10 +1,11 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Platform;
 using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Linq;
-using System.Collections.Generic;
 
 namespace video_converter
 {
@@ -15,6 +16,7 @@ namespace video_converter
         private Button? convertButton;
         private Button? selectFolderButton;
         private TextBlock? statusText;
+        private TextBox? outputNameTextBox;
         private string selectedFolder = "";
 
         public MainWindow()
@@ -25,6 +27,11 @@ namespace video_converter
             convertButton = this.FindControl<Button>("ConvertButton");
             selectFolderButton = this.FindControl<Button>("SelectFolderButton");
             statusText = this.FindControl<TextBlock>("StatusText");
+            outputNameTextBox = this.FindControl<TextBox>("OutputNameTextBox");
+
+            var uri = new Uri("avares://video-converter/logo/icon.png");
+            this.Icon = new WindowIcon(AssetLoader.Open(uri));
+
             SetupEventHandlers();
         }
 
@@ -33,7 +40,9 @@ namespace video_converter
             selectFolderButton.Click += async (sender, e) =>
             {
                 var dialog = new OpenFolderDialog();
+#pragma warning disable CS0618
                 var folder = await dialog.ShowAsync(this);
+#pragma warning restore CS0618
                 if (!string.IsNullOrWhiteSpace(folder))
                 {
                     selectedFolder = folder;
@@ -43,41 +52,55 @@ namespace video_converter
 
             convertButton.Click += async (sender, e) =>
             {
-                if (fileComboBox.SelectedItem == null)
+                if (fileComboBox?.SelectedItem == null)
                 {
-                    statusText.Text = "Wybierz plik wideo!";
+                    statusText?.SetValue(TextBlock.TextProperty, "Wybierz plik wideo!");
                     return;
                 }
 
                 string selectedFile = fileComboBox.SelectedItem as string;
-                string targetFormat = (formatComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() 
+                string targetFormat = (formatComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString()
                                       ?? formatComboBox.SelectedItem as string;
 
                 if (string.IsNullOrWhiteSpace(selectedFile) || string.IsNullOrWhiteSpace(targetFormat))
                 {
-                    statusText.Text = "Wybierz plik i format!";
+                    statusText?.SetValue(TextBlock.TextProperty, "Wybierz plik i format!");
                     return;
                 }
 
-                statusText.Text = $"Konwertowanie do {targetFormat}...";
+                string? customName = outputNameTextBox?.Text;
+                string outputFileName;
+                if (!string.IsNullOrWhiteSpace(customName))
+                {
+                    foreach (var c in Path.GetInvalidFileNameChars())
+                        customName = customName.Replace(c, '_');
+                    outputFileName = customName + "." + targetFormat;
+                }
+                else
+                {
+                    outputFileName = Path.GetFileNameWithoutExtension(selectedFile) + "." + targetFormat;
+                }
+
+                string outputDir = Path.GetDirectoryName(selectedFile) ?? "";
+                string outputPath = Path.Combine(outputDir, outputFileName);
+
+                statusText?.SetValue(TextBlock.TextProperty, $"Konwertowanie do {targetFormat}...");
 
                 try
                 {
                     var converter = new VideoConverter();
                     converter.OnConversionCompleted += (outputFile) =>
                     {
-                        statusText.Text = $"Konwersja zakończona! Plik wynikowy: {outputFile}";
+                        statusText?.SetValue(TextBlock.TextProperty, $"Konwersja zakończona! Plik wynikowy: {outputFile}");
                     };
 
-                    await converter.ConvertAsync(selectedFile, targetFormat);
+                    await converter.ConvertAsync(selectedFile, targetFormat, outputPath);
 
-                    var dir = Path.GetDirectoryName(selectedFile) ?? "";
-                    var outFile = Path.Combine(dir, Path.GetFileNameWithoutExtension(selectedFile) + "." + targetFormat);
-                    new LogManager().LogConversion(selectedFile, outFile, targetFormat);
+                    new LogManager().LogConversion(selectedFile, outputPath, targetFormat);
                 }
                 catch (Exception ex)
                 {
-                    statusText.Text = $"Błąd podczas konwersji: {ex.Message}";
+                    statusText?.SetValue(TextBlock.TextProperty, $"Błąd podczas konwersji: {ex.Message}");
                 }
             };
         }
@@ -89,8 +112,11 @@ namespace video_converter
                 .Where(f => extensions.Contains(Path.GetExtension(f).ToLower()))
                 .ToList();
 
-            fileComboBox.ItemsSource = files;
-            fileComboBox.SelectedIndex = files.Count > 0 ? 0 : -1;
+            if (fileComboBox != null)
+            {
+                fileComboBox.ItemsSource = files;
+                fileComboBox.SelectedIndex = files.Count > 0 ? 0 : -1;
+            }
         }
     }
 
@@ -98,17 +124,16 @@ namespace video_converter
 
     public interface IConverter
     {
-        event ConversionCompletedHandler OnConversionCompleted;
-        Task ConvertAsync(string inputFile, string targetFormat);
+        event ConversionCompletedHandler? OnConversionCompleted;
     }
 
     public abstract class ConverterBase : IConverter
     {
-        public event ConversionCompletedHandler OnConversionCompleted;
-        public string InputFile { get; set; }
-        public string OutputFile { get; set; }
+        public event ConversionCompletedHandler? OnConversionCompleted;
+        public string? InputFile { get; set; }
+        public string? OutputFile { get; set; }
 
-        public abstract Task ConvertAsync(string inputFile, string targetFormat);
+        public abstract Task ConvertAsync(string inputFile, string targetFormat, string outputPath);
 
         protected void RaiseConversionCompleted(string outputFile)
         {
@@ -118,17 +143,15 @@ namespace video_converter
 
     public class VideoConverter : ConverterBase
     {
-        public override async Task ConvertAsync(string inputFile, string targetFormat)
+        public override async Task ConvertAsync(string inputFile, string targetFormat, string outputPath)
         {
             InputFile = inputFile;
-            string fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputFile);
-            string directory = Path.GetDirectoryName(inputFile);
-            OutputFile = Path.Combine(directory, fileNameWithoutExt + "." + targetFormat);
+            OutputFile = outputPath;
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = $"-y -i \"{inputFile}\" \"{OutputFile}\"",
+                Arguments = $"-y -i \"{inputFile}\" \"{outputPath}\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -147,7 +170,7 @@ namespace video_converter
 
                     if (process.ExitCode == 0)
                     {
-                        RaiseConversionCompleted(OutputFile);
+                        RaiseConversionCompleted(outputPath);
                     }
                     else
                     {
@@ -159,14 +182,6 @@ namespace video_converter
             {
                 throw new Exception($"Conversion failed: {ex.Message}");
             }
-        }
-    }
-
-    public static class ConverterFactory
-    {
-        public static IConverter GetConverter(string inputFile)
-        {
-            return new VideoConverter();
         }
     }
 
